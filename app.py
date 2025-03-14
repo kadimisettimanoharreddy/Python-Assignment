@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+rom flask import Flask, render_template, request, redirect, url_for, flash
 import boto3
 import os
 
@@ -34,7 +34,7 @@ def index():
 
 @app.route('/bucket/<bucket_name>')
 def list_files(bucket_name):
-    """ List all files in the given bucket """
+    
     try:
         objects = s3_client.list_objects_v2(Bucket=bucket_name).get('Contents', [])
         if objects is None:
@@ -46,7 +46,7 @@ def list_files(bucket_name):
 
 @app.route('/create_bucket', methods=['POST'])
 def create_bucket():
-    """ Create a new S3 bucket """
+   
     bucket_name = request.form['bucket_name']
     try:
         s3_client.create_bucket(Bucket=bucket_name, CreateBucketConfiguration={'LocationConstraint': AWS_REGION})
@@ -57,29 +57,32 @@ def create_bucket():
 
 @app.route('/delete_bucket/<bucket_name>', methods=['POST'])
 def delete_bucket(bucket_name):
+  
     try:
+        # Check if bucket contains files
         objects = s3_client.list_objects_v2(Bucket=bucket_name).get('Contents', [])
-        if objects:
-            for obj in objects:
-                s3_client.delete_object(Bucket=bucket_name, Key=obj['Key'])
-
         versions = s3_client.list_object_versions(Bucket=bucket_name).get('Versions', [])
         delete_markers = s3_client.list_object_versions(Bucket=bucket_name).get('DeleteMarkers', [])
 
-        for version in versions:
-            s3_client.delete_object(Bucket=bucket_name, Key=version['Key'], VersionId=version['VersionId'])
-        
-        for marker in delete_markers:
-            s3_client.delete_object(Bucket=bucket_name, Key=marker['Key'], VersionId=marker['VersionId'])
+        # If bucket has files, versions, or delete markers, prevent deletion
+        if objects or versions or delete_markers:
+            flash("Bucket is not empty. Delete all files first!", "danger")
+            return redirect(url_for('index'))
 
+        # Proceed with deletion if empty
         s3_client.delete_bucket(Bucket=bucket_name)
         flash('Bucket deleted successfully!', 'success')
+
+    except s3_client.exceptions.NoSuchBucket:
+        flash("Bucket does not exist.", "danger")
     except Exception as e:
         flash(str(e), 'danger')
+
     return redirect(url_for('index'))
 
 @app.route('/upload_file/<bucket_name>', methods=['POST'])
 def upload_file(bucket_name):
+   
     file = request.files['file']
     if file:
         s3_client.upload_fileobj(file, bucket_name, file.filename)
@@ -88,6 +91,7 @@ def upload_file(bucket_name):
 
 @app.route('/delete_file/<bucket_name>/<file_key>')
 def delete_file(bucket_name, file_key):
+    
     try:
         s3_client.delete_object(Bucket=bucket_name, Key=file_key)
         flash('File deleted successfully!', 'success')
@@ -97,6 +101,7 @@ def delete_file(bucket_name, file_key):
 
 @app.route('/move_file/<bucket_name>', methods=['POST'])
 def move_file(bucket_name):
+   
     destination_bucket = request.form.get('destination_bucket')
     file_key = request.form.get('file_key')
     destination_key = request.form.get('destination_key', file_key)
@@ -119,6 +124,7 @@ def move_file(bucket_name):
 
 @app.route('/copy_file/<bucket_name>', methods=['POST'])
 def copy_file(bucket_name):
+    
     destination_bucket = request.form.get('destination_bucket')
     file_key = request.form.get('file_key')
     destination_key = request.form.get('destination_key', file_key)
@@ -140,6 +146,27 @@ def copy_file(bucket_name):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+ 
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
  
   
